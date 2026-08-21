@@ -238,7 +238,16 @@ jobs:
         cd "$OPENWRT_PATH"/bin/targets/*/*
         cp "$OPENWRT_PATH/.config" "$ARTIFACT_PREFIX.config"
         mv config.buildinfo "$ARTIFACT_PREFIX.config.buildinfo"
-        mv "$MANIFEST_FILE" "$ARTIFACT_PREFIX.manifest"
+        shopt -s nullglob
+        manifest_files=( *.manifest )
+        if [ ${#manifest_files[@]} -eq 0 ]; then
+          echo "Error: no .manifest file found under bin/targets/<target>/<subtarget>" >&2
+          exit 1
+        fi
+        if [ ${#manifest_files[@]} -gt 1 ]; then
+          echo "Warning: multiple .manifest files present, keeping the first: ${manifest_files[*]}" >&2
+        fi
+        mv "${manifest_files[0]}" "$ARTIFACT_PREFIX.manifest"
         case "$PACKAGE_EXTENSION" in
           apk | ipk) ;;
           *)
@@ -308,6 +317,15 @@ jobs:
         if [ -d "$OPENWRT_PATH/staging_dir" ]; then
           echo "staging: $(du -sh "$OPENWRT_PATH/staging_dir" | cut -f 1)"
         fi
+
+    - name: Save Cache(保存缓存)
+      if: always()
+      uses: actions/cache/save@v4
+      with:
+        key: ${{ env.CACHE_KEY }}
+        path: |
+          ${{ env.OPENWRT_PATH }}/.ccache
+          ${{ env.OPENWRT_PATH }}/staging_dir
 
     - name: Delete Old Workflows(删除旧工作流)
       if: ${{ inputs.delete_old_workflows }}
